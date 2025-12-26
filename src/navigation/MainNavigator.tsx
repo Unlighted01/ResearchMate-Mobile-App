@@ -10,8 +10,12 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { colors } from "../constants/colors";
 
-// Placeholder screens for now
+// Import all main screens
 import DashboardScreen from "../screens/main/DashboardScreen";
+import CollectionsScreen from "../screens/main/CollectionsScreen";
+import AIAssistantScreen from "../screens/main/AIAssistantScreen";
+import CitationsScreen from "../screens/main/CitationsScreen";
+import SettingsScreen from "../screens/main/SettingsScreen";
 
 // ============================================
 // PART 2: TAB BAR CONFIGURATION
@@ -32,21 +36,26 @@ const tabs = [
 export default function MainNavigator() {
   const [activeTab, setActiveTab] = React.useState("dashboard");
 
+  // Navigation function to pass to screens
+  const navigateToTab = (tab: string) => {
+    setActiveTab(tab);
+  };
+
   // Render screen based on active tab
   const renderScreen = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardScreen />;
+        return <DashboardScreen navigateToTab={navigateToTab} />;
       case "collections":
-        return <PlaceholderScreen title="Collections" icon="📁" />;
+        return <CollectionsScreen />;
       case "ai":
-        return <PlaceholderScreen title="AI Assistant" icon="✨" />;
+        return <AIAssistantScreen />;
       case "citations":
-        return <PlaceholderScreen title="Citations" icon="📝" />;
+        return <CitationsScreen />;
       case "settings":
-        return <PlaceholderScreen title="Settings" icon="⚙️" />;
+        return <SettingsScreen />;
       default:
-        return <DashboardScreen />;
+        return <DashboardScreen navigateToTab={navigateToTab} />;
     }
   };
 
@@ -63,7 +72,14 @@ export default function MainNavigator() {
             style={styles.tab}
             onPress={() => setActiveTab(tab.key)}
           >
-            <Text style={styles.tabIcon}>{tab.icon}</Text>
+            <Text
+              style={[
+                styles.tabIcon,
+                activeTab === tab.key && styles.tabIconActive,
+              ]}
+            >
+              {tab.icon}
+            </Text>
             <Text
               style={[
                 styles.tabLabel,
@@ -80,21 +96,7 @@ export default function MainNavigator() {
 }
 
 // ============================================
-// PART 4: PLACEHOLDER SCREEN COMPONENT
-// ============================================
-
-function PlaceholderScreen({ title, icon }: { title: string; icon: string }) {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderIcon}>{icon}</Text>
-      <Text style={styles.placeholderTitle}>{title}</Text>
-      <Text style={styles.placeholderText}>Coming soon...</Text>
-    </View>
-  );
-}
-
-// ============================================
-// PART 5: STYLES
+// PART 4: STYLES
 // ============================================
 
 const styles = StyleSheet.create({
@@ -121,6 +123,10 @@ const styles = StyleSheet.create({
   tabIcon: {
     fontSize: 22,
     marginBottom: 2,
+    opacity: 0.6,
+  },
+  tabIconActive: {
+    opacity: 1,
   },
   tabLabel: {
     fontSize: 10,
@@ -128,25 +134,5 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: colors.appleBlue,
-  },
-  placeholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.darkBg,
-  },
-  placeholderIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  placeholderTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.white,
-    marginBottom: 8,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: colors.gray1,
   },
 });
