@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { colors } from "../../constants/colors";
+import { Card, Button, Input, Loading } from "../../components/common";
 
 // ============================================
 // PART 2: TYPE DEFINITIONS

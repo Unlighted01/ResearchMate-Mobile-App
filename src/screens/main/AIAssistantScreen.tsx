@@ -6,7 +6,7 @@
 // PART 1: IMPORTS & DEPENDENCIES
 // ============================================
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,9 +18,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { colors } from "../../constants/colors";
 import { getAllItems } from "../../services/storageService";
+import { Card, Button } from "../../components/common";
 
 // ============================================
 // PART 2: TYPE DEFINITIONS
@@ -58,6 +60,30 @@ export default function AIAssistantScreen() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Animation refs for each message
+  const messageAnimations = useRef<Map<string, Animated.Value>>(new Map());
+
+  // Get or create animation value for a message
+  const getMessageAnimation = (messageId: string) => {
+    if (!messageAnimations.current.has(messageId)) {
+      messageAnimations.current.set(messageId, new Animated.Value(0));
+    }
+    return messageAnimations.current.get(messageId)!;
+  };
+
+  // Animate new messages
+  useEffect(() => {
+    messages.forEach((message) => {
+      const anim = getMessageAnimation(message.id);
+      Animated.spring(anim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [messages]);
 
   // ---------- PART 4B: HANDLERS ----------
   const sendMessage = async () => {
@@ -155,37 +181,71 @@ export default function AIAssistantScreen() {
           onContentSizeChange={() =>
             scrollViewRef.current?.scrollToEnd({ animated: true })
           }
+          showsVerticalScrollIndicator={false}
         >
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.messageBubble,
-                message.role === "user"
-                  ? styles.userBubble
-                  : styles.assistantBubble,
-              ]}
-            >
-              {message.role === "assistant" && (
-                <Text style={styles.assistantIcon}>✨</Text>
-              )}
-              <Text
+          {messages.map((message) => {
+            const anim = getMessageAnimation(message.id);
+            return (
+              <Animated.View
+                key={message.id}
                 style={[
-                  styles.messageText,
-                  message.role === "user"
-                    ? styles.userText
-                    : styles.assistantText,
+                  styles.messageWrapper,
+                  message.role === "user" ? styles.userWrapper : styles.assistantWrapper,
+                  {
+                    opacity: anim,
+                    transform: [
+                      {
+                        translateY: anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [20, 0],
+                        }),
+                      },
+                      {
+                        scale: anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.9, 1],
+                        }),
+                      },
+                    ],
+                  },
                 ]}
               >
-                {message.content}
-              </Text>
-            </View>
-          ))}
+                <Card
+                  variant={message.role === "user" ? "default" : "glass"}
+                  style={[
+                    styles.messageBubble,
+                    message.role === "user" ? styles.userBubble : styles.assistantBubble,
+                  ]}
+                  padding={12}
+                >
+                  <View style={styles.messageContent}>
+                    {message.role === "assistant" && (
+                      <View style={styles.assistantIconContainer}>
+                        <Text style={styles.assistantIcon}>✨</Text>
+                      </View>
+                    )}
+                    <Text
+                      style={[
+                        styles.messageText,
+                        message.role === "user" ? styles.userText : styles.assistantText,
+                      ]}
+                    >
+                      {message.content}
+                    </Text>
+                  </View>
+                </Card>
+              </Animated.View>
+            );
+          })}
           {loading && (
-            <View style={[styles.messageBubble, styles.assistantBubble]}>
-              <ActivityIndicator size="small" color={colors.appleBlue} />
-              <Text style={styles.typingText}>Thinking...</Text>
-            </View>
+            <Animated.View style={[styles.messageWrapper, styles.assistantWrapper]}>
+              <Card variant="glass" style={[styles.messageBubble, styles.assistantBubble]} padding={12}>
+                <View style={styles.typingContainer}>
+                  <ActivityIndicator size="small" color={colors.appleBlue} />
+                  <Text style={styles.typingText}>Thinking...</Text>
+                </View>
+              </Card>
+            </Animated.View>
           )}
         </ScrollView>
 
@@ -195,15 +255,18 @@ export default function AIAssistantScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.suggestionsContainer}
+            contentContainerStyle={styles.suggestionsContent}
           >
             {suggestions.map((suggestion, index) => (
-              <TouchableOpacity
+              <Card
                 key={index}
+                variant="outline"
                 style={styles.suggestionChip}
                 onPress={() => handleSuggestion(suggestion)}
+                padding={10}
               >
                 <Text style={styles.suggestionText}>{suggestion}</Text>
-              </TouchableOpacity>
+              </Card>
             ))}
           </ScrollView>
         )}
@@ -265,25 +328,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
+  messageWrapper: {
+    marginBottom: 12,
+  },
+  userWrapper: {
+    alignItems: "flex-end",
+  },
+  assistantWrapper: {
+    alignItems: "flex-start",
+  },
   messageBubble: {
     maxWidth: "85%",
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
   },
   userBubble: {
     backgroundColor: colors.appleBlue,
-    alignSelf: "flex-end",
   },
   assistantBubble: {
-    backgroundColor: colors.gray5,
-    alignSelf: "flex-start",
+    backgroundColor: "transparent",
+  },
+  messageContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  assistantIconContainer: {
+    marginRight: 8,
   },
   assistantIcon: {
-    marginRight: 8,
-    fontSize: 16,
+    fontSize: 18,
   },
   messageText: {
     fontSize: 15,
@@ -296,27 +367,29 @@ const styles = StyleSheet.create({
   assistantText: {
     color: colors.white,
   },
+  typingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   typingText: {
     color: colors.gray1,
     marginLeft: 8,
+    fontSize: 14,
   },
   suggestionsContainer: {
+    paddingVertical: 12,
+  },
+  suggestionsContent: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    maxHeight: 50,
+    gap: 8,
   },
   suggestionChip: {
-    backgroundColor: colors.gray5,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: colors.gray4,
   },
   suggestionText: {
-    color: colors.white,
+    color: colors.appleBlue,
     fontSize: 14,
+    fontWeight: "500",
   },
   inputContainer: {
     flexDirection: "row",
