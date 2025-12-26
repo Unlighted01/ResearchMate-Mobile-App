@@ -2,7 +2,7 @@
 // SETTINGS SCREEN - With Full Functionality
 // ============================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,10 @@ import {
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { colors } from "../../constants/colors";
+import {
+  getPreferences,
+  updatePreferences,
+} from "../../services/preferencesService";
 
 // Import feature screens
 import StatisticsScreen from "./StatisticsScreen";
@@ -38,8 +42,8 @@ export default function SettingsScreen() {
   const { user, signOut } = useAuth();
 
   // Settings state
-  const [appearance, setAppearance] = useState<"System" | "Dark" | "Light">(
-    "System"
+  const [appearance, setAppearance] = useState<"system" | "dark" | "light">(
+    "system"
   );
   const [citationStyle, setCitationStyle] = useState<
     "APA" | "MLA" | "Chicago" | "Harvard" | "IEEE"
@@ -51,6 +55,38 @@ export default function SettingsScreen() {
   const [showSmartPen, setShowSmartPen] = useState(false);
   const [showAppearancePicker, setShowAppearancePicker] = useState(false);
   const [showCitationPicker, setShowCitationPicker] = useState(false);
+
+  // Load preferences on mount
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    try {
+      const prefs = await getPreferences();
+      setAppearance(prefs.theme);
+      setCitationStyle(prefs.citationStyle);
+      setNotifications(prefs.notificationsEnabled);
+    } catch (error) {
+      console.error("Error loading preferences:", error);
+    }
+  };
+
+  // Save preferences when they change
+  useEffect(() => {
+    const savePrefs = async () => {
+      try {
+        await updatePreferences({
+          theme: appearance,
+          citationStyle,
+          notificationsEnabled: notifications,
+        });
+      } catch (error) {
+        console.error("Error saving preferences:", error);
+      }
+    };
+    savePrefs();
+  }, [appearance, citationStyle, notifications]);
 
   // Handlers
   const handleSignOut = () => {
