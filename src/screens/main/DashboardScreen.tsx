@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  Animated,
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { colors } from "../../constants/colors";
@@ -33,6 +34,7 @@ import {
 } from "../../services/collectionsService";
 import ResearchCard from "../../components/dashboard/ResearchCard";
 import ResearchItemModal from "../../components/dashboard/ResearchItemModal";
+import { Card, Loading } from "../../components/common";
 
 // ============================================
 // PART 2: PROPS & MAIN COMPONENT
@@ -62,6 +64,10 @@ export default function DashboardScreen({
   const [selectedItem, setSelectedItem] = useState<StorageItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Animation values
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(50))[0];
+
   // ---------- PART 2B: DATA FETCHING ----------
   const fetchData = useCallback(async () => {
     try {
@@ -85,6 +91,25 @@ export default function DashboardScreen({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Animate on load
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading, fadeAnim, slideAnim]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -143,13 +168,11 @@ export default function DashboardScreen({
   };
 
   // ---------- PART 2D: RENDER ----------
-
-  // ---------- PART 2C: RENDER ----------
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.appleBlue} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <Loading text="Loading your research..." fullScreen />
+      </SafeAreaView>
     );
   }
 
@@ -187,55 +210,79 @@ export default function DashboardScreen({
         </View>
 
         {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
+        <Animated.View
+          style={[
+            styles.statsContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Card variant="elevated" style={styles.statCard} padding={16}>
             <Text style={styles.statNumber}>{stats.total}</Text>
             <Text style={styles.statLabel}>Research Items</Text>
-          </View>
-          <View style={styles.statCard}>
+          </Card>
+          <Card variant="elevated" style={styles.statCard} padding={16}>
             <Text style={styles.statNumber}>{collections.length}</Text>
             <Text style={styles.statLabel}>Collections</Text>
-          </View>
-          <View style={styles.statCard}>
+          </Card>
+          <Card variant="elevated" style={styles.statCard} padding={16}>
             <Text style={styles.statNumber}>{stats.withSummary}</Text>
             <Text style={styles.statLabel}>AI Summaries</Text>
-          </View>
-        </View>
+          </Card>
+        </Animated.View>
 
         {/* Quick Actions */}
-        <View style={styles.section}>
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={styles.actionCard}
+            <Card
+              variant="glass"
               onPress={() => handleQuickAction("ai")}
+              style={styles.actionCard}
+              padding={20}
             >
               <Text style={styles.actionIcon}>✨</Text>
               <Text style={styles.actionText}>Ask AI</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionCard}
+            </Card>
+            <Card
+              variant="glass"
               onPress={() => handleQuickAction("citation")}
+              style={styles.actionCard}
+              padding={20}
             >
               <Text style={styles.actionIcon}>📝</Text>
               <Text style={styles.actionText}>New Citation</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionCard}
+            </Card>
+            <Card
+              variant="glass"
               onPress={() => handleQuickAction("add")}
+              style={styles.actionCard}
+              padding={20}
             >
               <Text style={styles.actionIcon}>➕</Text>
               <Text style={styles.actionText}>Add Research</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionCard}
+            </Card>
+            <Card
+              variant="glass"
               onPress={() => handleQuickAction("stats")}
+              style={styles.actionCard}
+              padding={20}
             >
               <Text style={styles.actionIcon}>📊</Text>
               <Text style={styles.actionText}>Statistics</Text>
-            </TouchableOpacity>
+            </Card>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Recent Research */}
         <View style={styles.section}>
@@ -259,13 +306,13 @@ export default function DashboardScreen({
                 />
               ))
           ) : (
-            <View style={styles.emptyState}>
+            <Card variant="glass" style={styles.emptyState} padding={32}>
               <Text style={styles.emptyIcon}>📚</Text>
               <Text style={styles.emptyText}>No research items yet</Text>
               <Text style={styles.emptySubtext}>
                 Your saved research from all devices will appear here
               </Text>
-            </View>
+            </Card>
           )}
         </View>
 
@@ -284,18 +331,20 @@ export default function DashboardScreen({
               style={styles.collectionsScroll}
             >
               {collections.slice(0, 5).map((collection) => (
-                <TouchableOpacity
+                <Card
                   key={collection.id}
+                  variant="elevated"
                   style={[
                     styles.collectionCard,
-                    { borderLeftColor: collection.color },
+                    { borderLeftColor: collection.color, borderLeftWidth: 4 },
                   ]}
+                  padding={16}
                 >
                   <Text style={styles.collectionName}>{collection.name}</Text>
                   <Text style={styles.collectionCount}>
                     {collection.itemCount || 0} items
                   </Text>
-                </TouchableOpacity>
+                </Card>
               ))}
             </ScrollView>
           </View>
@@ -323,12 +372,6 @@ export default function DashboardScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBg,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     backgroundColor: colors.darkBg,
   },
   scrollView: {
@@ -368,9 +411,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.gray5,
-    borderRadius: 16,
-    padding: 16,
     alignItems: "center",
   },
   statNumber: {
@@ -409,9 +449,6 @@ const styles = StyleSheet.create({
   },
   actionCard: {
     width: "47%",
-    backgroundColor: colors.gray5,
-    borderRadius: 16,
-    padding: 20,
     alignItems: "center",
   },
   actionIcon: {
@@ -424,9 +461,6 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   emptyState: {
-    backgroundColor: colors.gray5,
-    borderRadius: 16,
-    padding: 32,
     alignItems: "center",
   },
   emptyIcon: {
@@ -449,12 +483,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   collectionCard: {
-    backgroundColor: colors.gray5,
-    borderRadius: 12,
-    padding: 16,
     marginRight: 12,
     minWidth: 140,
-    borderLeftWidth: 4,
   },
   collectionName: {
     fontSize: 15,

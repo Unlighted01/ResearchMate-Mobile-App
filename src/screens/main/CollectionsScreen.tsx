@@ -15,10 +15,11 @@ import {
   TouchableOpacity,
   SafeAreaView,
   RefreshControl,
-  ActivityIndicator,
   Alert,
   TextInput,
   Modal,
+  Animated,
+  FlatList,
 } from "react-native";
 import { colors } from "../../constants/colors";
 import {
@@ -28,6 +29,11 @@ import {
   Collection,
   COLLECTION_COLORS,
 } from "../../services/collectionsService";
+import { Card, Button, Input, Loading } from "../../components/common";
+import {
+  getPreference,
+  setPreference,
+} from "../../services/preferencesService";
 
 // ============================================
 // PART 2: MAIN COMPONENT
@@ -44,6 +50,10 @@ export default function CollectionsScreen() {
   const [selectedColor, setSelectedColor] = useState(
     COLLECTION_COLORS[0].value
   );
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Animation values
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   // ---------- PART 2B: DATA FETCHING ----------
   const fetchCollections = useCallback(async () => {
@@ -60,7 +70,42 @@ export default function CollectionsScreen() {
 
   useEffect(() => {
     fetchCollections();
+    // Load saved view mode preference
+    loadViewModePreference();
   }, [fetchCollections]);
+
+  // Load view mode preference
+  const loadViewModePreference = async () => {
+    try {
+      const savedViewMode = await getPreference("collectionsViewMode");
+      setViewMode(savedViewMode);
+    } catch (error) {
+      console.error("Error loading view mode preference:", error);
+    }
+  };
+
+  // Save view mode preference when it changes
+  useEffect(() => {
+    const saveViewModePreference = async () => {
+      try {
+        await setPreference("collectionsViewMode", viewMode);
+      } catch (error) {
+        console.error("Error saving view mode preference:", error);
+      }
+    };
+    saveViewModePreference();
+  }, [viewMode]);
+
+  // Animate on load
+  useEffect(() => {
+    if (!loading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading, fadeAnim]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -114,27 +159,71 @@ export default function CollectionsScreen() {
   // ---------- PART 2D: RENDER ----------
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.appleBlue} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <Loading text="Loading collections..." fullScreen />
+      </SafeAreaView>
     );
   }
+
+  // Render collection card based on view mode
+  const renderCollectionItem = ({ item, index }: { item: Collection; index: number }) => (
+    <Animated.View
+      style={[
+        viewMode === 'grid' ? styles.gridItem : styles.listItem,
+        { opacity: fadeAnim },
+      ]}
+    >
+      <Card
+        variant="elevated"
+        onPress={() => Alert.alert(item.name, `${item.itemCount || 0} items`)}
+        onLongPress={() => handleDeleteCollection(item.id, item.name)}
+        style={viewMode === 'grid' ? styles.gridCard : styles.listCard}
+        padding={16}
+      >
+        <View style={[styles.colorBar, { backgroundColor: item.color }]} />
+        <View style={styles.cardContent}>
+          <Text style={styles.collectionName} numberOfLines={1}>{item.name}</Text>
+          {item.description && (
+            <Text style={styles.collectionDescription} numberOfLines={viewMode === 'grid' ? 2 : 1}>
+              {item.description}
+            </Text>
+          )}
+          <Text style={styles.itemCount}>{item.itemCount || 0} items</Text>
+        </View>
+      </Card>
+    </Animated.View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Collections</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowModal(true)}
-        >
-          <Text style={styles.addButtonText}>+ New</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.viewToggle}
+            onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            <Text style={styles.viewToggleText}>
+              {viewMode === 'grid' ? '☰' : '⊞'}
+            </Text>
+          </TouchableOpacity>
+          <Button
+            title="+ New"
+            onPress={() => setShowModal(true)}
+            size="small"
+            variant="primary"
+          />
+        </View>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <FlatList
+        data={collections}
+        renderItem={renderCollectionItem}
+        keyExtractor={(item) => item.id}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        key={viewMode}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -142,49 +231,22 @@ export default function CollectionsScreen() {
             tintColor={colors.appleBlue}
           />
         }
-      >
-        {collections.length > 0 ? (
-          collections.map((collection) => (
-            <TouchableOpacity
-              key={collection.id}
-              style={styles.collectionCard}
-              onLongPress={() =>
-                handleDeleteCollection(collection.id, collection.name)
-              }
-            >
-              <View
-                style={[styles.colorBar, { backgroundColor: collection.color }]}
-              />
-              <View style={styles.collectionContent}>
-                <Text style={styles.collectionName}>{collection.name}</Text>
-                {collection.description ? (
-                  <Text style={styles.collectionDescription} numberOfLines={2}>
-                    {collection.description}
-                  </Text>
-                ) : null}
-                <Text style={styles.itemCount}>
-                  {collection.itemCount || 0} items
-                </Text>
-              </View>
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-          ))
-        ) : (
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📁</Text>
             <Text style={styles.emptyText}>No collections yet</Text>
             <Text style={styles.emptySubtext}>
               Create collections to organize your research
             </Text>
-            <TouchableOpacity
-              style={styles.createButton}
+            <Button
+              title="Create Collection"
               onPress={() => setShowModal(true)}
-            >
-              <Text style={styles.createButtonText}>Create Collection</Text>
-            </TouchableOpacity>
+              variant="primary"
+              style={{ marginTop: 16 }}
+            />
           </View>
-        )}
-      </ScrollView>
+        }
+      />
 
       {/* Create Collection Modal */}
       <Modal
@@ -197,22 +259,19 @@ export default function CollectionsScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>New Collection</Text>
 
-            <TextInput
-              style={styles.input}
+            <Input
               placeholder="Collection name"
-              placeholderTextColor={colors.gray1}
               value={newName}
               onChangeText={setNewName}
             />
 
-            <TextInput
-              style={[styles.input, styles.textArea]}
+            <Input
               placeholder="Description (optional)"
-              placeholderTextColor={colors.gray1}
               value={newDescription}
               onChangeText={setNewDescription}
               multiline
               numberOfLines={3}
+              style={{ height: 80, textAlignVertical: 'top' }}
             />
 
             <Text style={styles.colorLabel}>Color</Text>
@@ -231,18 +290,18 @@ export default function CollectionsScreen() {
             </View>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
+              <Button
+                title="Cancel"
                 onPress={() => setShowModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveButton}
+                variant="secondary"
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Create"
                 onPress={handleCreateCollection}
-              >
-                <Text style={styles.saveButtonText}>Create</Text>
-              </TouchableOpacity>
+                variant="primary"
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
         </View>
@@ -260,12 +319,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBg,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.darkBg,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -278,58 +331,66 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: colors.white,
   },
-  addButton: {
-    backgroundColor: colors.appleBlue,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addButtonText: {
-    color: colors.white,
-    fontWeight: "600",
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  collectionCard: {
+  headerActions: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  viewToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
     backgroundColor: colors.gray5,
-    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  viewToggleText: {
+    fontSize: 18,
+    color: colors.white,
+  },
+  listContent: {
+    padding: 16,
+  },
+  gridItem: {
+    flex: 1,
+    margin: 6,
+  },
+  listItem: {
     marginBottom: 12,
-    overflow: "hidden",
+  },
+  gridCard: {
+    height: 140,
+  },
+  listCard: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cardContent: {
+    flex: 1,
   },
   colorBar: {
     width: 4,
     height: "100%",
     position: "absolute",
     left: 0,
-  },
-  collectionContent: {
-    flex: 1,
-    padding: 16,
-    paddingLeft: 20,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   collectionName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "600",
     color: colors.white,
     marginBottom: 4,
   },
   collectionDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.gray1,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   itemCount: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.gray2,
-  },
-  arrow: {
-    fontSize: 24,
-    color: colors.gray2,
-    marginRight: 16,
+    fontWeight: "500",
   },
   emptyState: {
     alignItems: "center",
@@ -351,17 +412,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 24,
   },
-  createButton: {
-    backgroundColor: colors.appleBlue,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  createButtonText: {
-    color: colors.white,
-    fontWeight: "600",
-    fontSize: 16,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -378,19 +428,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: colors.white,
     marginBottom: 20,
-  },
-  input: {
-    backgroundColor: colors.gray5,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: colors.white,
-    marginBottom: 16,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
   },
   colorLabel: {
     fontSize: 14,
@@ -415,29 +452,6 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: "row",
     gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: colors.gray5,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: colors.appleBlue,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  saveButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "600",
+    marginTop: 8,
   },
 });
