@@ -41,7 +41,8 @@ export default function ResearchItemModal({
   onClose,
   onDelete,
 }: ResearchItemModalProps) {
-  if (!item) return null;
+  // Guard against undefined item or item without id
+  if (!item || !item.id) return null;
 
   const deviceInfo = DEVICE_SOURCES[item.deviceSource] || DEVICE_SOURCES.web;
 
@@ -210,7 +211,7 @@ export default function ResearchItemModal({
           {/* Metadata */}
           <View style={styles.metadataSection}>
             <Text style={styles.metadataLabel}>
-              ID: {item.id.slice(0, 8)}...
+              ID: {String(item.id || "").slice(0, 8) || "N/A"}...
             </Text>
             {item.updatedAt && item.updatedAt !== item.createdAt && (
               <Text style={styles.metadataLabel}>
